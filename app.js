@@ -8,6 +8,8 @@ const session = require("express-session");
 const bcrypt = require("bcrypt");
 const passport = require("passport");
 const LocalStrategy = require("passport-local").Strategy;
+const FbStrategy = require("passport-facebook").Strategy;
+const GoogleStrategy = require("passport-google-oauth").OAuth2Strategy;
 const flash = require("connect-flash");
 const User = require("./models/user");
 
@@ -34,10 +36,6 @@ app.use(bodyParser.urlencoded({ extended: false }));
 app.use(cookieParser());
 app.use(express.static(path.join(__dirname, "public")));
 
-app.use("/", index);
-app.use("/users", users);
-app.use("/", authRoutes);
-
 //Use passport
 app.use(
   session({
@@ -61,6 +59,70 @@ passport.deserializeUser((id, cb) => {
 });
 
 app.use(flash());
+
+passport.use(
+  new GoogleStrategy(
+    {
+      clientID:
+        "185638716658-6gnrc1k6bvkud98tkbo3qsoaq490slto.apps.googleusercontent.com",
+      clientSecret: "LX6BcSEWAcgb-3C2IjfHfrvN",
+      callbackURL: "/auth/google/callback"
+    },
+    (accessToken, refreshToken, profile, done) => {
+      User.findOne({ googleID: profile.id }, (err, user) => {
+        if (err) {
+          return done(err);
+        }
+        if (user) {
+          return done(null, user);
+        }
+
+        const newUser = new User({
+          googleID: profile.id
+        });
+
+        newUser.save(err => {
+          if (err) {
+            return done(err);
+          }
+          done(null, newUser);
+        });
+      });
+    }
+  )
+);
+
+passport.use(
+  new FbStrategy(
+    {
+      clientID: "325767047916291",
+      clientSecret: "b6f9f8b1a7dc814dfce42cd97ea1db49",
+      callbackURL: "/auth/facebook/callback"
+    },
+    (accessToken, refreshToken, profile, done) => {
+      User.findOne({ facebookID: profile.id }, (err, user) => {
+        if (err) {
+          return done(err);
+        }
+        if (user) {
+          return done(null, user);
+        }
+
+        const newUser = new User({
+          facebookID: profile.id
+        });
+
+        newUser.save(err => {
+          if (err) {
+            return done(err);
+          }
+          done(null, newUser);
+        });
+      });
+    }
+  )
+);
+
 passport.use(
   new LocalStrategy(
     {
@@ -86,6 +148,10 @@ passport.use(
 
 app.use(passport.initialize());
 app.use(passport.session());
+
+app.use("/", index);
+app.use("/users", users);
+app.use("/", authRoutes);
 
 // catch 404 and forward to error handler
 app.use(function(req, res, next) {
